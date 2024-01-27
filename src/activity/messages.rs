@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::net::IpAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
@@ -147,7 +147,7 @@ impl TryFrom<&PathBuf> for MessageFileParser {
     }
 }
 
-fn is_message_file(path: &PathBuf) -> bool {
+fn is_message_file(path: &Path) -> bool {
     let valid_filename = regex::Regex::new(r"\/message_[\d]+\.json$").unwrap();
     valid_filename.is_match(path.to_str().unwrap())
 }
@@ -189,7 +189,7 @@ pub fn select_message_folder() -> PathBuf {
     folders[res].clone()
 }
 
-pub fn get_all_messages(folder: &PathBuf) -> Result<Vec<Message>, MagicError> {
+pub fn get_all_messages(folder: &Path) -> Result<Vec<Message>, MagicError> {
     let mut parsed_filecount = 0;
     let mut messages = Vec::new();
     for entry in
