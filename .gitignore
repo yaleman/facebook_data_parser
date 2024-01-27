@@ -1,0 +1,11 @@
+/target
+/data/*
+/output/*
+
+# random dev things
+.vscode/
+.DS_Store
+dist/
+.env
+.envrc
+*.ascdata/*
