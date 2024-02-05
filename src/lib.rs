@@ -31,6 +31,8 @@ pub enum ActivityActivity {
 #[derive(Subcommand, Debug, Clone)]
 pub enum ActivityMessagesSubCommand {
     ReorgImages,
+    ReorgVideos,
+    ListFiles,
 }
 
 #[derive(Args, Debug)]

@@ -1,14 +1,15 @@
+//!
+//!  Messages related things
+//!
 use std::fs::File;
 use std::io::BufReader;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
+use rayon::prelude::*;
 use serde::Deserialize;
 
 use crate::{ActivityMessages, MagicError, BASE_PATH};
-
-/// Messages related things
-///
 
 pub struct MessageBox {
     pub filepath: String,
@@ -26,7 +27,13 @@ pub struct MessageParticipant {
 #[serde(deny_unknown_fields)]
 pub struct MessageMagicWord {
     pub magic_word: String,
-    pub creation_timestamp_ms: u64,
+
+    #[serde(
+        with = "chrono::serde::ts_milliseconds_option",
+        default = "default_none_dt"
+    )]
+    pub creation_timestamp_ms: Option<DateTime<Utc>>,
+    // pub creation_timestamp_ms: u64,
     pub animation_emoji: String,
 }
 
@@ -62,7 +69,8 @@ pub struct MessageShare {
 #[serde(deny_unknown_fields)]
 pub struct MessageMedia {
     pub uri: Option<String>,
-    pub creation_timestamp: u64,
+    #[serde(with = "chrono::serde::ts_seconds_option", default = "default_none_dt")]
+    pub creation_timestamp: Option<DateTime<Utc>>,
     pub share_text: Option<String>,
     pub is_geoblocked_for_viewer: Option<bool>,
 }
@@ -92,7 +100,8 @@ pub struct MessageReaction {
 #[serde(deny_unknown_fields)]
 pub struct MessageVideo {
     pub uri: String,
-    pub creation_timestamp: u64,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub creation_timestamp: DateTime<Utc>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -107,11 +116,12 @@ pub struct MessageSticker {
     pub uri: String,
     pub ai_stickers: Vec<MessageAiSticker>,
 }
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct MessageFile {
     pub uri: String,
-    pub creation_timestamp: u64,
+    #[serde(with = "chrono::serde::ts_seconds_option", default = "default_none_dt")]
+    pub creation_timestamp: Option<DateTime<Utc>>,
     pub title: Option<String>,
 }
 
@@ -217,16 +227,57 @@ pub fn get_all_messages(folder: &Path) -> Result<Vec<Message>, MagicError> {
     Ok(messages)
 }
 
+pub fn reorg_videos(msg: ActivityMessages) -> Result<(), MagicError> {
+    let folder = match msg.target_folder {
+        Some(folder) => PathBuf::from(folder),
+        None => select_message_folder(),
+    };
+
+    let messages = get_all_messages(&folder)?;
+    let username = folder.iter().last().unwrap().to_str().unwrap();
+
+    messages.par_iter().for_each(|msg| {
+        // println!("{:?}", msg);
+        if let Some(videos) = &msg.videos {
+            for video in videos {
+                // println!("Photo: {:?}", photo);
+
+                let filepath = PathBuf::from(format!("{}/{}", BASE_PATH, video.uri));
+
+                let datepath = PathBuf::from(format!(
+                    "output/{}/{}",
+                    username,
+                    video.creation_timestamp.format("%Y/%m")
+                ));
+                if !datepath.exists() {
+                    std::fs::create_dir_all(&datepath).unwrap();
+                }
+                let timestamp_filebit = video.creation_timestamp.format("%Y-%m-%d-%H-%M-%S");
+
+                let new_filename = format!(
+                    "{}/{}-{}",
+                    datepath.display(),
+                    timestamp_filebit,
+                    filepath.file_name().unwrap().to_str().unwrap()
+                );
+                println!("new_filename {}", new_filename);
+                // copy the file
+                std::fs::copy(&filepath, &new_filename).unwrap();
+            }
+        }
+    });
+
+    Ok(())
+}
+
 pub fn reorg_images(msg: ActivityMessages) -> Result<(), MagicError> {
-    println!("Messages: {:?}", msg);
+    // println!("Messages: {:?}", msg);
     let folder = match msg.target_folder {
         Some(folder) => PathBuf::from(folder),
         None => select_message_folder(),
     };
     println!("Target folder: {}", folder.display());
     let messages = get_all_messages(&folder)?;
-
-    use rayon::prelude::*;
 
     let username = folder.iter().last().unwrap().to_str().unwrap();
 
@@ -248,12 +299,6 @@ pub fn reorg_images(msg: ActivityMessages) -> Result<(), MagicError> {
                             std::fs::create_dir_all(&datepath).unwrap();
                         }
                         let timestamp_filebit = timestamp.format("%Y-%m-%d-%H-%M-%S");
-                        // photo.
-                        // println!("timestamp {}", timestamp_filebit);
-                        // println!(
-                        //     "filepath {}",
-                        //     filepath.file_name().unwrap().to_str().unwrap()
-                        // );
 
                         let new_filename = format!(
                             "{}/{}-{}",
@@ -272,6 +317,26 @@ pub fn reorg_images(msg: ActivityMessages) -> Result<(), MagicError> {
         }
     });
 
+    Ok(())
+}
+
+pub fn list_files(msg: ActivityMessages) -> Result<(), MagicError> {
+    let folder = match msg.target_folder {
+        Some(folder) => PathBuf::from(folder),
+        None => select_message_folder(),
+    };
+    println!("Target folder: {}", folder.display());
+    let messages = get_all_messages(&folder)?;
+
+    // let username = folder.iter().last().unwrap().to_str().unwrap();
+
+    messages.par_iter().for_each(|msg| {
+        if let Some(files) = msg.files.clone() {
+            for file in files {
+                println!("File: {:?}", file);
+            }
+        }
+    });
     Ok(())
 }
 
