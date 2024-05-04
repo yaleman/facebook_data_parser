@@ -1,12 +1,14 @@
 //!
 //!  Messages related things
 //!
+use std::fmt::Display;
 use std::fs::File;
 use std::io::BufReader;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
 use rayon::prelude::*;
+use regex::Regex;
 use serde::Deserialize;
 
 use crate::{ActivityMessages, MagicError, BASE_PATH};
@@ -317,6 +319,215 @@ pub fn reorg_images(msg: ActivityMessages) -> Result<(), MagicError> {
         }
     });
 
+    Ok(())
+}
+
+#[derive(Default, Debug)]
+struct SearchTerms {
+    pub earliest: Option<DateTime<Utc>>,
+    pub latest: Option<DateTime<Utc>>,
+    pub string: Option<String>,
+    pub regex: Option<Regex>,
+}
+
+enum SearchMenu {
+    SetEarliest,
+    ClearEarliest,
+    SetLatest,
+    ClearLatest,
+    SetString,
+    ClearString,
+    SetRegex,
+    ClearRegex,
+    Run,
+    Quit,
+}
+
+impl AsRef<str> for SearchMenu {
+    fn as_ref(&self) -> &str {
+        match self {
+            SearchMenu::SetEarliest => "Set Earliest Date",
+            SearchMenu::ClearEarliest => "Clear Earliest Date",
+            SearchMenu::SetLatest => "Set Latest Date",
+            SearchMenu::ClearLatest => "Clear Latest Date",
+            SearchMenu::SetString => "Set Search String",
+            SearchMenu::ClearString => "Clear Search String",
+            SearchMenu::SetRegex => "Set Search Regex",
+            SearchMenu::ClearRegex => "Clear Search Regex",
+            SearchMenu::Quit => "Quit",
+            SearchMenu::Run => "Run",
+        }
+    }
+}
+
+impl From<usize> for SearchMenu {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => SearchMenu::SetEarliest,
+            1 => SearchMenu::ClearEarliest,
+            2 => SearchMenu::SetLatest,
+            3 => SearchMenu::ClearLatest,
+            4 => SearchMenu::SetString,
+            5 => SearchMenu::ClearString,
+            6 => SearchMenu::SetRegex,
+            7 => SearchMenu::ClearRegex,
+            8 => SearchMenu::Run,
+            9 => SearchMenu::Quit,
+            _ => panic!("Invalid value"),
+        }
+    }
+}
+
+impl Display for SearchMenu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_ref())
+    }
+}
+
+pub fn search_messages(path: Option<PathBuf>) -> Result<(), MagicError> {
+    let path = match path {
+        Some(path) => path,
+        None => select_message_folder(),
+    };
+    println!("Loading messages from target folder: {}", path.display());
+    let messages = get_all_messages(&path)?;
+
+    let mut searchterms = SearchTerms::default();
+    loop {
+        eprintln!("#################################");
+        eprintln!("Search terms:");
+        eprintln!("{:#?}", &searchterms);
+        eprintln!("#################################");
+
+        let selected: SearchMenu = dialoguer::Select::new()
+            .with_prompt("Select search type")
+            .items(
+                &[
+                    SearchMenu::SetEarliest,
+                    SearchMenu::ClearEarliest,
+                    SearchMenu::SetLatest,
+                    SearchMenu::ClearLatest,
+                    SearchMenu::SetString,
+                    SearchMenu::ClearString,
+                    SearchMenu::SetRegex,
+                    SearchMenu::ClearRegex,
+                    SearchMenu::Run,
+                    SearchMenu::Quit,
+                ]
+                .map(|x| x.to_string()),
+            )
+            .interact()
+            .unwrap()
+            .into();
+        println!("Selected: {}", selected);
+
+        match selected {
+            SearchMenu::SetEarliest => {
+                let earliest = dialoguer::Input::<String>::new()
+                    .with_prompt("Enter earliest date")
+                    .interact()
+                    .unwrap();
+                let earliest = match DateTime::parse_from_rfc3339(&earliest) {
+                    Ok(dt) => dt.with_timezone(&Utc),
+                    Err(e) => {
+                        eprintln!("Failed to parse date: {:?}", e);
+                        continue;
+                    }
+                };
+                searchterms.earliest = Some(earliest);
+            }
+            SearchMenu::ClearEarliest => searchterms.earliest = None,
+            SearchMenu::SetLatest => {
+                let latest = dialoguer::Input::<String>::new()
+                    .with_prompt("Enter latest date")
+                    .interact()
+                    .unwrap();
+                let latest = match DateTime::parse_from_rfc3339(&latest) {
+                    Ok(dt) => dt.with_timezone(&Utc),
+                    Err(e) => {
+                        eprintln!("Failed to parse date: {:?}", e);
+                        continue;
+                    }
+                };
+                searchterms.latest = Some(latest);
+            }
+            SearchMenu::ClearLatest => searchterms.latest = None,
+            SearchMenu::SetString => {
+                let string = dialoguer::Input::<String>::new()
+                    .with_prompt("Enter search string")
+                    .interact()
+                    .unwrap();
+                if string.trim().is_empty() {
+                    eprintln!("String cannot be empty");
+                    continue;
+                }
+                searchterms.string = Some(string);
+            }
+            SearchMenu::ClearString => searchterms.string = None,
+            SearchMenu::SetRegex => {
+                let regex = dialoguer::Input::<String>::new()
+                    .with_prompt("Enter search regex")
+                    .interact()
+                    .unwrap();
+                if regex.trim().is_empty() {
+                    eprintln!("Regex cannot be empty");
+                    continue;
+                }
+                match regex::Regex::try_from(regex) {
+                    Err(err) => {
+                        eprintln!("Failed to parse regex: {:?}", err);
+                        continue;
+                    }
+                    Ok(regex) => {
+                        searchterms.regex = Some(regex);
+                    }
+                }
+            }
+            SearchMenu::ClearRegex => searchterms.regex = None,
+            SearchMenu::Quit => return Ok(()),
+            SearchMenu::Run => {
+                println!("Running search");
+
+                break;
+            }
+        }
+    }
+    let regex = searchterms.regex.clone();
+
+    messages.into_iter().for_each(|msg| {
+        if let Some(earliest) = searchterms.earliest {
+            if msg.timestamp_ms < earliest.timestamp_millis() as u64 {
+                return;
+            }
+        }
+
+        if let Some(latest) = searchterms.latest {
+            if msg.timestamp_ms > latest.timestamp_millis() as u64 {
+                return;
+            }
+        }
+
+        // filter on string
+
+        if let Some(string) = &searchterms.string {
+            if !msg
+                .content
+                .as_ref()
+                .unwrap_or(&"".to_string())
+                .contains(string)
+            {
+                return;
+            }
+        }
+
+        // filter on regex
+        if let Some(regex) = &regex {
+            if !regex.is_match(&msg.content.clone().unwrap_or("".to_string())) {
+                return;
+            }
+        }
+        println!("{:?}", &msg)
+    });
     Ok(())
 }
 

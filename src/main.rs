@@ -1,5 +1,7 @@
 use clap::Parser;
-use facebook_data_parser::activity::messages::{list_files, reorg_images, reorg_videos};
+use facebook_data_parser::activity::messages::{
+    list_files, reorg_images, reorg_videos, search_messages,
+};
 // use enum_iterator::all;
 // use facebook_data_parser::activity::ActivityTypes;
 use facebook_data_parser::{
@@ -25,6 +27,9 @@ fn main() {
                     }
                     ActivityMessagesSubCommand::ListFiles => {
                         list_files(msg).expect("Failed to list files")
+                    }
+                    ActivityMessagesSubCommand::SearchMessages { path } => {
+                        search_messages(path).expect("Failed to search messages")
                     }
                 }
                 // reorg_images(msg).expect("Failed to reorg messages");

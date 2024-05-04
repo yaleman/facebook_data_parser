@@ -28,11 +28,14 @@ pub enum ActivityActivity {
     Messages(ActivityMessages),
 }
 
-#[derive(Subcommand, Debug, Clone)]
+pub struct ActivityMessagesSearchMessages {}
+
+#[derive(Subcommand, Debug)]
 pub enum ActivityMessagesSubCommand {
     ReorgImages,
     ReorgVideos,
     ListFiles,
+    SearchMessages { path: Option<PathBuf> },
 }
 
 #[derive(Args, Debug)]

@@ -282,6 +282,7 @@ dependencies = [
  "clap",
  "dialoguer",
  "enum-iterator",
+ "fuzzy-muff",
  "glob",
  "rayon",
  "regex",
@@ -300,6 +301,15 @@ name = "fuzzy-matcher"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54614a3312934d066701a80f20f15fa3b56d67ac7722b39eea5b4c9dd1d66c94"
+dependencies = [
+ "thread_local",
+]
+
+[[package]]
+name = "fuzzy-muff"
+version = "0.3.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "331179e18cf2ef4a2fa3b48e8885d6a2efe8947167231135f72303cf8fd1d0ba"
 dependencies = [
  "thread_local",
 ]
