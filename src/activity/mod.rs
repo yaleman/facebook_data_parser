@@ -6,10 +6,6 @@ use crate::{Skippable, BASE_PATH};
 
 pub mod messages;
 
-/// Activity parser
-///
-///
-
 static PARENT_FOLDER: &str = "your_activity_across_facebook";
 
 #[derive(Debug, PartialEq, Sequence)]
@@ -17,8 +13,6 @@ pub enum ActivityTypes {
     BugBounty,
     Messages,
 }
-
-// impl ActivityTypes {}
 
 impl Skippable for ActivityTypes {
     fn path(&self) -> PathBuf {

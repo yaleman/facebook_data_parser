@@ -236,7 +236,7 @@ pub fn reorg_videos(msg: ActivityMessages) -> Result<(), MagicError> {
     };
 
     let messages = get_all_messages(&folder)?;
-    let username = folder.iter().last().unwrap().to_str().unwrap();
+    let username = folder.iter().next_back().unwrap().to_str().unwrap();
 
     messages.par_iter().for_each(|msg| {
         // println!("{:?}", msg);
@@ -281,7 +281,7 @@ pub fn reorg_images(msg: ActivityMessages) -> Result<(), MagicError> {
     println!("Target folder: {}", folder.display());
     let messages = get_all_messages(&folder)?;
 
-    let username = folder.iter().last().unwrap().to_str().unwrap();
+    let username = folder.iter().next_back().unwrap().to_str().unwrap();
 
     messages.par_iter().for_each(|msg| {
         // println!("{:?}", msg);
