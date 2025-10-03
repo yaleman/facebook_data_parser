@@ -6,6 +6,7 @@ use clap::{Args, Subcommand};
 use enum_iterator::Sequence;
 
 pub mod activity;
+pub mod search;
 
 #[derive(clap::Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -20,6 +21,23 @@ pub enum CliCommands {
     Activity {
         #[clap(subcommand)]
         command: ActivityActivity,
+    },
+    Search {
+        /// Earliest date to search (format: YYYY-MM-DD)
+        #[clap(long)]
+        earliest: Option<String>,
+        /// Latest date to search (format: YYYY-MM-DD)
+        #[clap(long)]
+        latest: Option<String>,
+        /// Comma-separated list of activity types to search (posts,comments,reactions,events,groups,messages)
+        #[clap(long)]
+        types: Option<String>,
+        /// Show file paths for image and file attachments in messages
+        #[clap(long)]
+        show_paths: bool,
+        /// Only show messages that have image or file attachments
+        #[clap(long)]
+        has_attachments: bool,
     },
 }
 

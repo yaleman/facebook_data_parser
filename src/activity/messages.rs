@@ -13,6 +13,8 @@ use serde::Deserialize;
 
 use crate::{ActivityMessages, MagicError, BASE_PATH};
 
+use super::common::{ActivityItem, ActivityType};
+
 pub struct MessageBox {
     pub filepath: String,
     pub filename: String,
@@ -77,7 +79,7 @@ pub struct MessageMedia {
     pub is_geoblocked_for_viewer: Option<bool>,
 }
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 
 fn default_none_dt() -> Option<DateTime<Utc>> {
     None
@@ -146,6 +148,46 @@ pub struct Message {
     pub audio_files: Option<Vec<MessageMedia>>,
     pub ip: Option<IpAddr>,
     pub missed: Option<bool>,
+}
+
+impl ActivityItem for Message {
+    fn timestamp(&self) -> DateTime<Utc> {
+        // timestamp_ms is milliseconds since epoch
+        let secs = (self.timestamp_ms / 1000) as i64;
+        let nanos = ((self.timestamp_ms % 1000) * 1_000_000) as u32;
+        Utc.timestamp_opt(secs, nanos)
+            .single()
+            .unwrap_or_else(|| Utc.timestamp_opt(0, 0).unwrap())
+    }
+
+    fn description(&self) -> String {
+        let sender = &self.sender_name;
+
+        if let Some(content) = &self.content {
+            if content.chars().count() > 100 {
+                let truncated: String = content.chars().take(100).collect();
+                format!("Message from {}: {}...", sender, truncated)
+            } else {
+                format!("Message from {}: {}", sender, content)
+            }
+        } else if self.photos.is_some() {
+            format!("Message from {} (photo)", sender)
+        } else if self.videos.is_some() {
+            format!("Message from {} (video)", sender)
+        } else if self.files.is_some() {
+            format!("Message from {} (file)", sender)
+        } else if self.sticker.is_some() {
+            format!("Message from {} (sticker)", sender)
+        } else if self.call_duration.is_some() {
+            format!("Call with {}", sender)
+        } else {
+            format!("Message from {}", sender)
+        }
+    }
+
+    fn activity_type(&self) -> ActivityType {
+        ActivityType::Messages
+    }
 }
 
 impl TryFrom<&PathBuf> for MessageFileParser {

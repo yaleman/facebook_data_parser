@@ -4,7 +4,13 @@ use enum_iterator::Sequence;
 
 use crate::{Skippable, BASE_PATH};
 
+pub mod comments;
+pub mod common;
+pub mod events;
+pub mod groups;
 pub mod messages;
+pub mod posts;
+pub mod reactions;
 
 static PARENT_FOLDER: &str = "your_activity_across_facebook";
 
